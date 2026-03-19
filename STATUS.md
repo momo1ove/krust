@@ -1,8 +1,8 @@
 # kkrieger-rust-fps Progress
 
-**Last Updated:** Thu Mar 19 09:00:01 AM UTC 2026
+**Last Updated:** Thu Mar 19 09:08:45 AM UTC 2026
 
-**Last Commit:** c772276 chore: add release build status tracking
+**Last Commit:** 86ce01e feat: basic FPS look+WASD controller
 
 **Binary Sizes:**
 - Debug: 606M

@@ -10,11 +10,33 @@ struct FpsCamera {
     pitch: f32,
 }
 
+// Shootable target component
+#[derive(Component)]
+struct Shootable {
+    original_color: Color,
+}
+
+// Hit effect component for animation
+#[derive(Component)]
+struct HitEffect {
+    timer: Timer,
+}
+
+// Score component
+#[derive(Component)]
+struct Score(usize);
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
-        .add_systems(Update, (fps_movement, fps_look, lock_cursor))
+        .add_systems(Update, (
+            fps_movement, 
+            fps_look, 
+            lock_cursor, 
+            click_to_shoot,
+            hit_effect_update,
+        ))
         .run();
 }
 
@@ -110,19 +132,96 @@ fn setup(
         });
     }
 
-    // Random boxes to shoot at
+    // Random boxes to shoot at (with Shootable component)
     let mut rng = rand::thread_rng();
-    for _ in 0..8 {
+    for i in 0..8 {
         let x = rand::Rng::gen_range(&mut rng, -8.0..8.0);
         let z = rand::Rng::gen_range(&mut rng, -8.0..8.0);
         let scale = rand::Rng::gen_range(&mut rng, 0.5..1.5);
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Cuboid::new(scale, scale, scale))),
-            material: mat.clone(),
-            transform: Transform::from_xyz(x, scale / 2.0, z),
+        
+        // Vary colors for targets
+        let color = Color::srgb(
+            rand::Rng::gen_range(&mut rng, 0.3..1.0),
+            rand::Rng::gen_range(&mut rng, 0.3..1.0),
+            rand::Rng::gen_range(&mut rng, 0.3..1.0),
+        );
+        let target_mat = materials.add(StandardMaterial {
+            base_color: color,
+            perceptual_roughness: 0.7,
+            metallic: 0.1,
             ..default()
         });
+        
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Cuboid::new(scale, scale, scale))),
+                material: target_mat,
+                transform: Transform::from_xyz(x, scale / 2.0, z),
+                ..default()
+            },
+            Shootable { original_color: color },
+            Name::new(format!("Target_{}", i)),
+        ));
     }
+
+    // Crosshair UI - using a simple colored node
+    commands.spawn(
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                width: Val::Px(20.0),
+                height: Val::Px(20.0),
+                left: Val::Percent(50.0),
+                top: Val::Percent(50.0),
+                margin: UiRect {
+                    left: Val::Px(-10.0),
+                    top: Val::Px(-10.0),
+                    ..default()
+                },
+                ..default()
+            },
+            background_color: BackgroundColor(Color::srgba(1.0, 0.2, 0.2, 0.8)),
+            ..default()
+        }
+    );
+
+    // HUD - simple text showing controls
+    commands.spawn(
+        TextBundle::from_section(
+            "WASD: Move | Mouse: Look | Click: Shoot",
+            TextStyle {
+                font_size: 18.0,
+                color: Color::srgba(1.0, 1.0, 1.0, 0.7),
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        }),
+    );
+
+    // Score counter
+    commands.spawn((
+        TextBundle::from_section(
+            "Hits: 0",
+            TextStyle {
+                font_size: 24.0,
+                color: Color::srgba(0.2, 1.0, 0.2, 0.9),
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            right: Val::Px(10.0),
+            ..default()
+        }),
+        Score(0),
+        Name::new("ScoreDisplay"),
+    ));
 }
 
 fn lock_cursor(mut windows: Query<&mut Window>) {
@@ -194,5 +293,102 @@ fn fps_movement(
         
         // Keep on ground
         transform.translation.y = 1.7;
+    }
+}
+
+fn click_to_shoot(
+    mut commands: Commands,
+    buttons: Res<ButtonInput<bevy::input::mouse::MouseButton>>,
+    cameras: Query<(&Transform, &Camera)>,
+    shootables: Query<(Entity, &Transform, &Shootable)>,
+    mut score_query: Query<(&mut Text, &mut Score)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    if !buttons.just_pressed(bevy::input::mouse::MouseButton::Left) {
+        return;
+    }
+
+    let (camera_transform, _camera) = cameras.single();
+
+    // Ray from camera forward
+    let ray_origin = camera_transform.translation;
+    let ray_dir: Vec3 = *-camera_transform.forward();
+
+    let mut closest_hit: Option<(Entity, f32, Vec3)> = None;
+
+    for (entity, transform, _) in shootables.iter() {
+        let target_pos = transform.translation;
+        // Approximate box as sphere for simplicity
+        let target_size = transform.scale.x.max(transform.scale.y).max(transform.scale.z) * 0.6;
+
+        // Ray-sphere intersection
+        let oc = ray_origin - target_pos;
+        let a = ray_dir.dot(ray_dir);
+        let b = 2.0 * oc.dot(ray_dir);
+        let c = oc.dot(oc) - target_size * target_size;
+        let discriminant = b * b - 4.0 * a * c;
+
+        if discriminant > 0.0 {
+            let t = (-b - discriminant.sqrt()) / (2.0 * a);
+            if t > 0.0 && t < 50.0 { // Max distance check
+                let hit_pos = ray_origin + ray_dir * t;
+                if let Some((_, closest_dist, _)) = closest_hit {
+                    if t < closest_dist {
+                        closest_hit = Some((entity, t, hit_pos));
+                    }
+                } else {
+                    closest_hit = Some((entity, t, hit_pos));
+                }
+            }
+        }
+    }
+
+    if let Some((hit_entity, _hit_dist, hit_pos)) = closest_hit {
+        // Despawn the hit target
+        commands.entity(hit_entity).despawn();
+        
+        // Update score
+        for (mut text, mut score) in score_query.iter_mut() {
+            score.0 += 1;
+            text.sections[0].value = format!("Hits: {}", score.0);
+        }
+        
+        // Spawn explosion effect
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Cuboid::new(0.4, 0.4, 0.4))),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::srgb(1.0, 0.4, 0.1),
+                    emissive: Color::srgb(0.8, 0.2, 0.0).into(),
+                    ..default()
+                }),
+                transform: Transform::from_translation(hit_pos),
+                ..default()
+            },
+            HitEffect {
+                timer: Timer::from_seconds(0.25, TimerMode::Once),
+            },
+        ));
+    }
+}
+
+fn hit_effect_update(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut effects: Query<(Entity, &mut Transform, &mut HitEffect)>,
+) {
+    for (entity, mut transform, mut effect) in effects.iter_mut() {
+        effect.timer.tick(time.delta());
+        
+        // Shrink effect
+        let elapsed = effect.timer.elapsed_secs();
+        let duration = effect.timer.duration().as_secs_f32();
+        let scale = if duration > 0.0 { 1.0 - (elapsed / duration) } else { 0.0 };
+        transform.scale = Vec3::splat(0.4 * scale);
+        
+        if effect.timer.finished() {
+            commands.entity(entity).despawn();
+        }
     }
 }
