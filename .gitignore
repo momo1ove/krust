@@ -1,9 +1,18 @@
-# Rust
+# Rust / Cargo
 /target/
 **/*.rs.bk
-Cargo.lock
 
-# IDE
+# OS / Editor
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
-.DS_Store
+
+# Logs / temp
+*.log
+*.tmp
+*.bak
+
+# Env
+.env
+.env.*
