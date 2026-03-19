@@ -1,0 +1,17 @@
+[package]
+name = "kkrieger-rust-fps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.14"
+noise = "0.9"
+rand = "0.8"
+
+# Smaller release binaries (optional, helps a bit)
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
