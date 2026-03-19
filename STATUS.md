@@ -1,17 +1,17 @@
 # kkrieger-rust-fps Progress
 
-**Last Updated:** Thu Mar 19 08:56 AM UTC 2026
+**Last Updated:** Thu Mar 19 09:00:01 AM UTC 2026
 
-**Last Commit:** 1917a93 feat: procedural texture room prototype
+**Last Commit:** c772276 chore: add release build status tracking
 
 **Binary Sizes:**
 - Debug: 606M
-- Release: 30M (after LTO + strip)
+- Release: 30M
 
-**Current Task:** Adding FPS camera + WASD controls
+**Current Task:** Building procedural FPS with Bevy
 
 **Next Steps:**
-1. Add FPS camera + WASD controls (IN PROGRESS)
+1. Add FPS camera + WASD controls
 2. Add procedural room generation
 3. Add shooting mechanics
-4. Optimize binary size (target: <10MB)
+4. Optimize binary size
