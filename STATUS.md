@@ -1,8 +1,8 @@
 # kkrieger-rust-fps Progress
 
-**Last Updated:** Thu Mar 19 09:08:45 AM UTC 2026
+**Last Updated:** Thu Mar 19 10:00:01 AM UTC 2026
 
-**Last Commit:** 86ce01e feat: basic FPS look+WASD controller
+**Last Commit:** b3c9324 Add click-to-shoot raycast, hit feedback, crosshair and HUD
 
 **Binary Sizes:**
 - Debug: 606M
